@@ -192,7 +192,8 @@ for i in range(EPOCHS):
             print('save new model, epoch: {0}'.format(i + 1))
 
 # 测试集
-best_model = torch.load('model/best_dkt_model.pt')
+best_model = torch.load('best_dkt_model.pt')
+best_model.eval()
 test_dataset = QuizDataSet(skill_size, test_seqs)
 test_data_loader = DataLoader(test_dataset, collate_fn=collate, batch_size=BATCH_SIZE)
 test_auc = compute_auc(test_data_loader, best_model)
