@@ -128,7 +128,6 @@ class DktNet(Module):
 
     def forward(self, x):
         rnn_output, h = self.rnn(x)
-        # rnn_output无需保留序列结构数据，直接用rnn_output.data
         dropout_output = self.dropout(rnn_output.data)
         linear_output = self.linear(dropout_output)
         output = self.sigmoid(linear_output)
@@ -148,53 +147,55 @@ def compute_auc(data_loader, model):
         y_ans = torch.cat((y_ans, y_ans_batch))
     return roc_auc_score(y_ans, y_pred)
 
-# rnn隐藏单元数量
-HIDDEN_SIZE = 200
-# rnn隐藏层数量
-HIDDEN_LAYER_SIZE = 1
-DROPOUT_RATE = 0.5
-EPOCHS = 20
-BATCH_SIZE = 100
 
-skill_size, seq_list = read_data('data/dkt.csv')
-train_seqs, val_seqs, test_seqs = split_dataset(seq_list)
-train_dataset = QuizDataSet(skill_size, train_seqs)
-val_dataset = QuizDataSet(skill_size, val_seqs)
-model = DktNet(skill_size, HIDDEN_SIZE, HIDDEN_LAYER_SIZE, DROPOUT_RATE)
-criterion = torch.nn.BCELoss()
-optimizer = torch.optim.Adagrad(model.parameters())
-train_data_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, collate_fn=collate, shuffle=True)
-val_data_loader = DataLoader(val_dataset, collate_fn=collate, batch_size=BATCH_SIZE)
-max_val_auc = 0
-for i in range(EPOCHS):
-    train_y_pred = torch.tensor([])
-    train_y_ans = torch.tensor([])
-    for j, batched in enumerate(train_data_loader):
-        x_batch, y_skill_batch, y_ans_batch = batched
-        skill_pred = model(x_batch)
-        y_pred = (skill_pred * y_skill_batch).sum(dim=1)
-        loss = criterion(y_pred, y_ans_batch)
-        train_y_pred = torch.cat((train_y_pred, y_pred))
-        train_y_ans = torch.cat((train_y_ans, y_ans_batch))
-        print('epoch: {0}, step: {1}, loss: {2}'.format(i + 1, j + 1, loss.item()))
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-    with torch.no_grad():
-        # 验证集auc
-        val_auc = compute_auc(val_data_loader, model)
-        # 训练集auc
-        train_auc = roc_auc_score(train_y_ans, train_y_pred.detach().numpy())
-        print('epoch: {0}, train_auc: {1}, val_auc: {2}'.format(i + 1, train_auc, val_auc))
-        if val_auc > max_val_auc:
-            max_val_auc = val_auc
-            torch.save(model, 'best_dkt_model.pt')
-            print('save new model, epoch: {0}'.format(i + 1))
+if __name__ == '__main__':
+    # rnn隐藏单元数量
+    HIDDEN_SIZE = 200
+    # rnn隐藏层数量
+    HIDDEN_LAYER_SIZE = 1
+    DROPOUT_RATE = 0.5
+    EPOCHS = 20
+    BATCH_SIZE = 100
 
-# 测试集
-best_model = torch.load('best_dkt_model.pt')
-best_model.eval()
-test_dataset = QuizDataSet(skill_size, test_seqs)
-test_data_loader = DataLoader(test_dataset, collate_fn=collate, batch_size=BATCH_SIZE)
-test_auc = compute_auc(test_data_loader, best_model)
-print('test_auc: {0}'.format(test_auc))
+    skill_size, seq_list = read_data('data/dkt.csv')
+    train_seqs, val_seqs, test_seqs = split_dataset(seq_list)
+    train_dataset = QuizDataSet(skill_size, train_seqs)
+    val_dataset = QuizDataSet(skill_size, val_seqs)
+    model = DktNet(skill_size, HIDDEN_SIZE, HIDDEN_LAYER_SIZE, DROPOUT_RATE)
+    criterion = torch.nn.BCELoss()
+    optimizer = torch.optim.Adagrad(model.parameters())
+    train_data_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, collate_fn=collate, shuffle=True)
+    val_data_loader = DataLoader(val_dataset, collate_fn=collate, batch_size=BATCH_SIZE)
+    max_val_auc = 0
+    for i in range(EPOCHS):
+        train_y_pred = torch.tensor([])
+        train_y_ans = torch.tensor([])
+        for j, batched in enumerate(train_data_loader):
+            x_batch, y_skill_batch, y_ans_batch = batched
+            skill_pred = model(x_batch)
+            y_pred = (skill_pred * y_skill_batch).sum(dim=1)
+            loss = criterion(y_pred, y_ans_batch)
+            train_y_pred = torch.cat((train_y_pred, y_pred))
+            train_y_ans = torch.cat((train_y_ans, y_ans_batch))
+            print('epoch: {0}, step: {1}, loss: {2}'.format(i + 1, j + 1, loss.item()))
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        with torch.no_grad():
+            # 验证集auc
+            val_auc = compute_auc(val_data_loader, model)
+            # 训练集auc
+            train_auc = roc_auc_score(train_y_ans, train_y_pred.detach().numpy())
+            print('epoch: {0}, train_auc: {1}, val_auc: {2}'.format(i + 1, train_auc, val_auc))
+            if val_auc > max_val_auc:
+                max_val_auc = val_auc
+                torch.save(model, 'best_dkt_model.pt')
+                print('save new model, epoch: {0}'.format(i + 1))
+
+    # 测试集
+    best_model = torch.load('best_dkt_model.pt')
+    best_model.eval()
+    test_dataset = QuizDataSet(skill_size, test_seqs)
+    test_data_loader = DataLoader(test_dataset, collate_fn=collate, batch_size=BATCH_SIZE)
+    test_auc = compute_auc(test_data_loader, best_model)
+    print('test_auc: {0}'.format(test_auc))
