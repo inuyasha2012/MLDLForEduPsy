@@ -128,8 +128,7 @@ class DktNet(Module):
 
     def forward(self, x):
         rnn_output, h = self.rnn(x)
-        dropout_output = self.dropout(rnn_output.data)
-        linear_output = self.linear(dropout_output)
+        linear_output = self.linear(rnn_output.data)
         output = self.sigmoid(linear_output)
         return output
 
